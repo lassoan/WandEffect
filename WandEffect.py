@@ -63,7 +63,7 @@ class WandEffectOptions(EditorLib.LabelEffectOptions):
     self.maxPixelsSpinBox = qt.QDoubleSpinBox(self.maxPixelsFrame)
     self.maxPixelsSpinBox.setToolTip("Set the maxPixels for each click")
     self.maxPixelsSpinBox.minimum = 1
-    self.maxPixelsSpinBox.maximum = 100000
+    self.maxPixelsSpinBox.maximum = 1000000
     self.maxPixelsSpinBox.suffix = ""
     self.maxPixelsFrame.layout().addWidget(self.maxPixelsSpinBox)
     self.widgets.append(self.maxPixelsSpinBox)
@@ -278,7 +278,13 @@ class WandEffectLogic(LabelEffect.LabelEffectLogic):
     hi = value + tolerance
     pixelsSet = 0
     toVisit = [ijk,]
-    visited = []    
+    # Create a map that contains the location of the pixels
+    # that have been already visited (added or considered to be added).
+    # This is required if paintOver is enabled because then we reconsider
+    # all pixels (not just the ones that have not labelled yet).
+    if paintOver:
+      labelDrawVisitedArray = vtk.util.numpy_support.numpy.zeros(labelDrawArray.shape)
+      
     while toVisit != []:
       location = toVisit.pop(0)
       try:
@@ -291,17 +297,13 @@ class WandEffectLogic(LabelEffect.LabelEffectLogic):
         continue
       if (paintOver and l == label):
         # label is the current one, but maybe it was filled with another high/low value,
-        # so we have to visit it once (and only once) in this session, too
-        visitedCurrentLocation = True
-        try:
-          visited.index(location)
-        except ValueError:
-          # not found, so not visited yet
-          visitedCurrentLocation = False
-        if visitedCurrentLocation:        
+        # so we have to visit it once (and only once) in this session, too        
+        if  labelDrawVisitedArray[location] != 0:
+          # visited already, so don't try to fill it again
           continue
         else:
-          visited.append(location)
+          # we'll visit this pixel now, so mark it as visited
+          labelDrawVisitedArray[location]=1
       if b < lo or b > hi:
         continue
       labelDrawArray[location] = label        
